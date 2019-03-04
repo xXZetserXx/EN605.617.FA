@@ -1,6 +1,5 @@
 #! /bin/bash
 make
-./assignment.exe 64
 ./assignment.exe 256
 ./assignment.exe 512
 ./assignment.exe 1024
