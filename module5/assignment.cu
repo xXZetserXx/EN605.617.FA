@@ -19,7 +19,7 @@ __global__ void dotMultAddShared(float *A, float *B, float *C, const int sideLen
     
     // Hold threads in block for copy to finish
     __syncthreads();
-    
+    //printf("a[%d]: %f b[%d]: %f\n", idx, a[idx], idx, B[idx]);
     C[idx] = a[idx] * B[idx] + a[idx] + B[idx];
 }
 
@@ -68,10 +68,16 @@ int main(int argc, char** argv)
     // Using square matrices for ease.
     // Calculate matrix size and adjust totalThreads if it has no integer sqrt.
     const int side = static_cast<int>(sqrt(totalThreads));
-    printf("Matrix size: %d x %d", side, side);
-    totalThreads = side*side;
-    printf("Total number of threads: %d\n", totalThreads);
-    numBlocks = totalThreads/blockSize;
+    printf("Matrix size: %d x %d\n", side, side);
+    if (totalThreads!=(side*side)) {
+    	totalThreads = side*side;
+    	numBlocks = totalThreads/blockSize;
+    }
+    
+    printf("Total threads: %d\n", totalThreads);
+    printf("Block size: %d\n", blockSize);
+    printf("Number of blocks: %d\n", numBlocks);
+    
     
     // 
     float *h_A, *h_B, *h_C1, *h_C2;
@@ -89,7 +95,6 @@ int main(int argc, char** argv)
     for(int i=0; i<totalThreads; i++) {
     	h_A[i] = 2.0f;
     	h_B[i] = 1.0f;
-    	//printf("h_A[%d]: %f h_B[%d]: %f\n", i, h_A[i], i, h_B[i]);
     	h_C1[i] = 0.0f;
     	h_C2[i] = 0.0f;
     }
