@@ -17,16 +17,16 @@ __host__ cudaEvent_t get_time(void) {
 // Following function pulled from register.cu class file
 __host__ void generate_rand_data(unsigned int * host_data_ptr, const unsigned int num_elem)
 {
-        for(unsigned int i=0; i < num_elem; i++)
-        {
-                host_data_ptr[i] = (unsigned int) (rand()%20);
-        }
+	// Generate random values from 0-19
+    for(unsigned int i=0; i < num_elem; i++)
+    	host_data_ptr[i] = (unsigned int) (rand()%20);
 }
 
 
 __global__ void gpuRegKern_registers(unsigned int *A, unsigned int *B, const int num_elem) {
 	const unsigned int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 	
+	// Perform same operation as in other kernels but using registers as source data.
 	if(idx < (num_elem)) {
 		// Load data from global memory into registers
 		unsigned int a = A[idx];
@@ -44,6 +44,7 @@ __global__ void gpuRegKern_registers(unsigned int *A, unsigned int *B, const int
 __global__ void gpuRegKern_shared(unsigned int *A, unsigned int *B, const int num_elem) {
 	const unsigned int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 	
+	// Perform same operation as in other kernels but using shared memory as source data.
 	if(idx < num_elem) {
 		extern __shared__ unsigned int concatCoeff[];
 		
@@ -59,6 +60,7 @@ __global__ void gpuRegKern_shared(unsigned int *A, unsigned int *B, const int nu
 __global__ void gpuRegKern_const(unsigned int *C, const int num_elem) {
 	const unsigned int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 	
+	// Perform same operation as in other kernels but using constant memory as source data.
 	if(idx < num_elem) {
 		C[idx] = (constDevA[idx]*constDevB[idx] + constDevA[idx] + constDevB[idx]) * (constDevA[idx]*constDevB[idx] + constDevA[idx] + constDevB[idx]);
 	}
@@ -98,9 +100,7 @@ __host__ void kernelCaller_Reg(const unsigned int totalThreads, const unsigned i
 	
 	// Timestamp before copying device to device, running kernel, and copy back
 	cudaEvent_t stopT = get_time();
-	
-	//cudaThreadSynchronize();		// Wait for GPU kernels to complete
-	cudaEventSynchronize(stopT);		// cudaThreadSynchronize is deprecated, but might need older version to work on vocareum
+	cudaEventSynchronize(stopT);
 	
 	float delta = 0;
 	cudaEventElapsedTime(&delta, startT, stopT);
@@ -151,9 +151,7 @@ __host__ void kernelCaller_Shar(const unsigned int totalThreads, const unsigned 
 	
 	// Timestamp before copying device to device, running kernel, and copy back
 	cudaEvent_t stopT = get_time();
-	
-	//cudaThreadSynchronize();		// Wait for GPU kernels to complete
-	cudaEventSynchronize(stopT);		// cudaThreadSynchronize is deprecated, but might need older version to work on vocareum
+	cudaEventSynchronize(stopT);
 	
 	float delta = 0;
 	cudaEventElapsedTime(&delta, startT, stopT);
@@ -202,9 +200,7 @@ __host__ void kernelCaller_const(const unsigned int totalThreads, const unsigned
 	
 	// Timestamp before copying device to device, running kernel, and copy back
 	cudaEvent_t stopT = get_time();
-	
-	//cudaThreadSynchronize();		// Wait for GPU kernels to complete
-	cudaEventSynchronize(stopT);		// cudaThreadSynchronize is deprecated, but might need older version to work on vocareum
+	cudaEventSynchronize(stopT);
 	
 	float delta = 0;
 	cudaEventElapsedTime(&delta, startT, stopT);
