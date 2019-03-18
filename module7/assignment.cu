@@ -21,9 +21,9 @@ __global__ void gpuKernel(int *A, int *B, int *C, const int num_elem) {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
 	if(idx < (num_elem)) {
 		// Load data from global memory into registers
-		unsigned int a = A[idx];
-		unsigned int b = B[idx];
-		unsigned int c = 0;
+		int a = A[idx];
+		int b = B[idx];
+		int c = 0;
 		
 		// Perform some math on the array values
 		c = (a*b) + a + b;
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
     
     // Timers
     cudaEvent_t startT, stopT;
-    float *deltaT;
+    float deltaT;
     
     startT = get_time();
     
@@ -87,7 +87,6 @@ int main(int argc, char **argv) {
 	generate_rand_data(h_b, arraySize);
 	
     /* =================================================================================
-     * For each stream queue up copy of data from host pinned memory to device memory.
      * We are only copying part of full data each time. Queueing in a ping-pong fashion
      * like shown below optimizes the execution timeline. Trying to queue all stream0
      * operations and then queue all stream1 operations will cause the copy back to host
@@ -117,8 +116,8 @@ int main(int argc, char **argv) {
 	stopT = get_time();
 	cudaEventSynchronize(stopT);
 	
-	//cudaEventElapsedTime(deltaT, startT, stopT);
-	//printf("Elasped Time: %fms\n", *deltaT);
+	cudaEventElapsedTime(&deltaT, startT, stopT);
+	printf("Elasped Time: %fms\n", deltaT);
 	
 	// Cleanup memory
 	cudaFreeHost(h_a);
