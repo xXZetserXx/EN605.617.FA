@@ -34,11 +34,25 @@ __global__ void gpuKernel(int *A, int *B, int *C, const int num_elem) {
 
 
 int main(int argc, char **argv) {
-    const int arraySize = 4096;     // Total number of elements to process.
-    const int N = 128;              // Number of elements to pass to GPU at one time.
+    int arraySize = 4096;     // Total number of elements to process.
+    int N = 256;              // Number of elements to pass to GPU at one time.
+    int tpb = 128;
+    
+    if(argc >= 2)
+    	arraySize = atoi(argv[1]);
+	if(argc >= 3)
+		N = atoi(argv[2]);
+	if(argc >= 4)
+		tpb = atoi(argv[3]);
+    
+    if(arraySize % N !=0 || N%tpb!=0) {
+    	printf("Number of total threads is not divisible by number of elements to process in each stream iteration.\n");
+    	return 0;
+    }
     
     const int h_byteSize = arraySize*sizeof(int);
     const int d_byteSize = N*sizeof(int);
+    
     
     cudaDeviceProp prop;
     int whichDevice;
@@ -53,12 +67,7 @@ int main(int argc, char **argv) {
         return 0;
     }
     
-    // Timers
-    cudaEvent_t startT, stopT;
-    float deltaT;
-    
-    startT = get_time();
-    
+
     cudaStream_t stream0, stream1;
     cudaStreamCreate(&stream0);
     cudaStreamCreate(&stream1);
@@ -86,6 +95,12 @@ int main(int argc, char **argv) {
 	generate_rand_data(h_a, arraySize);
 	generate_rand_data(h_b, arraySize);
 	
+	// Timers
+    cudaEvent_t startT, stopT;
+    float deltaT;
+    
+    startT = get_time();
+    
     /* =================================================================================
      * We are only copying part of full data each time. Queueing in a ping-pong fashion
      * like shown below optimizes the execution timeline. Trying to queue all stream0
@@ -102,8 +117,8 @@ int main(int argc, char **argv) {
         cudaMemcpyAsync(d_b0, h_b+i,    d_byteSize, cudaMemcpyHostToDevice, stream0);
         cudaMemcpyAsync(d_b1, h_b+i+N,  d_byteSize, cudaMemcpyHostToDevice, stream1);
         // Queue up running of gpu kernel
-        gpuKernel<<<N/128, 128, 0, stream0>>>(d_a0, d_b0, d_c0, N);
-        gpuKernel<<<N/128, 128, 0, stream1>>>(d_a1, d_b1, d_c1, N);
+        gpuKernel<<<N/tpb, tpb, 0, stream0>>>(d_a0, d_b0, d_c0, N);
+        gpuKernel<<<N/tpb, tpb, 0, stream1>>>(d_a1, d_b1, d_c1, N);
         // Queue up copy of data from device to pinned memory
         cudaMemcpyAsync(h_c+i,      d_c0, d_byteSize, cudaMemcpyDeviceToHost, stream0);
         cudaMemcpyAsync(h_c+i+N,    d_c1, d_byteSize, cudaMemcpyDeviceToHost, stream1);
@@ -129,6 +144,8 @@ int main(int argc, char **argv) {
 	cudaFree(d_a1);
 	cudaFree(d_b1);
 	cudaFree(d_c1);
+	cudaEventDestroy(startT);
+	cudaEventDestroy(stopT);
 	
 	cudaStreamDestroy(stream0);
 	cudaStreamDestroy(stream1);
