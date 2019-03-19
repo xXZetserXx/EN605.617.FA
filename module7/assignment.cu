@@ -33,23 +33,7 @@ __global__ void gpuKernel(int *A, int *B, int *C, const int num_elem) {
 }
 
 
-int main(int argc, char **argv) {
-    int arraySize = 4096;     // Total number of elements to process.
-    int N = 256;              // Number of elements to pass to GPU at one time.
-    int tpb = 128;
-    
-    if(argc >= 2)
-    	arraySize = atoi(argv[1]);
-	if(argc >= 3)
-		N = atoi(argv[2]);
-	if(argc >= 4)
-		tpb = atoi(argv[3]);
-    
-    if(arraySize % N !=0 || N%tpb!=0) {
-    	printf("Number of total threads is not divisible by number of elements to process in each stream iteration.\n");
-    	return 0;
-    }
-    
+__host__ float execute_concurrent_streamed_kernel(int arraySize, int N, int tpb) {    
     const int h_byteSize = arraySize*sizeof(int);
     const int d_byteSize = N*sizeof(int);
     
@@ -132,7 +116,7 @@ int main(int argc, char **argv) {
 	cudaEventSynchronize(stopT);
 	
 	cudaEventElapsedTime(&deltaT, startT, stopT);
-	printf("Elasped Time: %fms\n", deltaT);
+	
 	
 	// Cleanup memory
 	cudaFreeHost(h_a);
@@ -149,6 +133,96 @@ int main(int argc, char **argv) {
 	
 	cudaStreamDestroy(stream0);
 	cudaStreamDestroy(stream1);
+	return deltaT;
+}
+
+__host__ float execute_kernel(int arraySize, int tpb) {    
+    const int h_byteSize = arraySize*sizeof(int);    
     
+    
+    int *h_a, *h_b, *h_c;
+    // Create two sets of GPU buffers
+    int *d_a, *d_b, *d_c;    // Buffers used in stream1
+    
+    // Allocate pinned memory, cudaMemcpyAsync requires host memory be page-locked
+    cudaHostAlloc((void **)&h_a, h_byteSize, cudaHostAllocDefault);
+    cudaHostAlloc((void **)&h_b, h_byteSize, cudaHostAllocDefault);
+    cudaHostAlloc((void **)&h_c, h_byteSize, cudaHostAllocDefault);
+    
+    cudaMalloc((void**) &d_a, h_byteSize);
+    cudaMalloc((void**) &d_b, h_byteSize);
+    cudaMalloc((void**) &d_c, h_byteSize);
+    
+    // Fill host arrays with random data
+	generate_rand_data(h_a, arraySize);
+	generate_rand_data(h_b, arraySize);
+	
+	// Timers
+    cudaEvent_t startT, stopT;
+    float deltaT;
+    
+    startT = get_time();
+    
+	// Copy data to device
+    cudaMemcpy(d_a, h_a, h_byteSize, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, h_byteSize, cudaMemcpyHostToDevice);
+    
+    gpuKernel<<<arraySize/tpb, tpb>>>(d_a, d_b, d_c, arraySize);
+	
+	cudaMemcpy(h_c, d_c, h_byteSize, cudaMemcpyDeviceToHost);
+	
+	stopT = get_time();
+	cudaEventSynchronize(stopT);
+	
+	cudaEventElapsedTime(&deltaT, startT, stopT);
+	
+	
+	// Cleanup memory
+	cudaFreeHost(h_a);
+	cudaFreeHost(h_b);
+	cudaFreeHost(h_c);
+	cudaFree(d_a);
+	cudaFree(d_b);
+	cudaFree(d_c);
+	cudaEventDestroy(startT);
+	cudaEventDestroy(stopT);
+
+	return deltaT;
+}
+
+
+int main(int argc, char **argv) {
+    int arraySize = 4096;     // Total number of elements to process.
+    int N = 256;              // Number of elements to pass to GPU at one time.
+    int tpb = 128;
+    
+    if(argc >= 2)
+    	arraySize = atoi(argv[1]);
+	if(argc >= 3)
+		N = atoi(argv[2]);
+	if(argc >= 4)
+		tpb = atoi(argv[3]);
+    
+    if(arraySize % N !=0 || N%tpb!=0) {
+    	printf("Number of total threads is not divisible by number of elements to process in each stream iteration.\n");
+    	return 0;
+    }
+
+	float delta_concurrent = execute_concurrent_streamed_kernel(arraySize, N, tpb);
+	float delta_normal = execute_kernel(arraySize, tpb);
+
+	printf("========================\n");
+	printf("Summary\n");
+	printf("Total Threads: %d\n", arraySize);
+	printf("Number of concurrent kernel instances: %d\n", N);
+	printf("Thread Size: %d\n", tpb);
+	printf("========================\n");
+	printf("Time to copy memory and execute kernel with two streams running concurrently.\n");
+	printf("duration: %fms\n",delta_concurrent);
+	printf("========================\n");
+	printf("Time to copy memory and execute kernel running using a normal kernel execution.\n");
+	printf("duration: %fms\n\n\n",delta_normal);
     
 }
+
+
