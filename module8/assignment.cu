@@ -8,15 +8,16 @@
 typedef float2 Complex;
 
 
-const uint16_t imgSize = 1024;
+const uint16_t imgSize = 128;
 
 /*
  * Kernel to calculate relative position from center for a given pixel in a vectorized 2D image/array
  */
 __global__ void calcRelativePosition(float *pos, int arraySize)
 {
-	uint col = (blockIdx.x * blockDim.x) + threadIdx.x;
-	uint row = (blockIdx.y * blockDim.y) + threadIdx.y;
+	uint idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	uint col = idx%arraySize;
+    uint row = idx/arraySize;
 
 	//int threadId = blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x)+ threadIdx.x;
 
@@ -25,10 +26,10 @@ __global__ void calcRelativePosition(float *pos, int arraySize)
 	uint rel_row = row-arraySize/2;
 	uint rel_col = col-arraySize/2;
 
-	float relative = sqrt((float)(rel_col*rel_col)+ (rel_row*rel_row));
+	float relative = sqrt((float)((rel_col*rel_col)+ (rel_row*rel_row)));
 	pos[pixelPos] = relative;
 
-	printf("xPos: %3u yPos: %3u \nPixel Distance from Center: %3.3f\n", col, row, relative);
+	//printf("xPos: %3u yPos: %3u \nPixel Distance from Center: %3.3f\n", col, row, relative);
 
 }
 
@@ -64,15 +65,13 @@ __host__ void driver() {
 	h_relPos    = (float*)malloc(size_bytes);
 	cudaMalloc((void**)&d_relPos, size_bytes);
 
-	calcRelativePosition<<<numBlocks,blockSize>>>(d_relPos, totalPixels);
+	calcRelativePosition<<<numBlocks,blockSize>>>(d_relPos, imgSize);
 
 	cudaMemcpy(h_relPos, d_relPos, size_bytes, cudaMemcpyDeviceToHost);
 
-	for(int i=0; i<imgSize; i++) {
-		for(int j=0; j<imgSize; j++) {
-
-		}
-	}
+    int center = (imgSize/2);
+    
+    printf("Relative Position: %3.3f for (%d,%d)", h_relPos[center*imgSize+(center+20)], center+20, center);
 
 
 	cudaFree(d_relPos);
@@ -82,5 +81,6 @@ __host__ void driver() {
 
 int main(int argc, char** argv)
 {
+    driver();
 	return 0;
 }
