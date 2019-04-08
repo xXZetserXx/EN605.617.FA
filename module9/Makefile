@@ -9,5 +9,10 @@ NPPLIBS := -lnppc_static -lnppial_static -lnppicc_static -lnppicom_static -lnppi
 INCLUDES += -I./
 LIBRARIES += -lculibos ${NPPLIBS} -lX11
 
-all: nppAssignment.cpp
+target1: nppAssignment.cpp
 	nvcc nppAssignment.cpp -o nppExec ${INCLUDES} ${LIBRARIES} -std=c++11
+
+target2: thrustAssignment.cu
+	nvcc thrustAssignment.cu -o thrustExec ${INCLUDES} ${LIBRARIES}
+	
+all: target1 target2
