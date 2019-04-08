@@ -4,6 +4,7 @@
  *  Created on: Apr 8, 2019
  *      Author: wolffmb1
  */
+#define cimg_use_png
 #include "CImg.h"
 
 #include <string.h>

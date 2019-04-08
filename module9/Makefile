@@ -10,9 +10,9 @@ INCLUDES += -I./
 LIBRARIES += -lculibos ${NPPLIBS} -lX11
 
 target1: nppAssignment.cpp
-	nvcc nppAssignment.cpp -o nppExec ${INCLUDES} ${LIBRARIES} -std=c++11
+	nvcc nppAssignment.cpp -o nppExec ${INCLUDES} ${LIBRARIES} -lpng -std=c++11
 
 target2: thrustAssignment.cu
-	nvcc thrustAssignment.cu -o thrustExec ${INCLUDES} ${LIBRARIES}
+	nvcc thrustAssignment.cu -o thrustExec ${INCLUDES} ${LIBRARIES} -std=c++11
 	
 all: target1 target2
