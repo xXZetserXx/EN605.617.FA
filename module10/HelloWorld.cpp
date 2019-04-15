@@ -16,6 +16,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <map>
+#include <cstring>
 
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
@@ -178,7 +180,7 @@ cl_program CreateProgram(cl_context context, cl_device_id device, const char* fi
 //  and b (input)
 //
 bool CreateMemObjects(cl_context context, cl_mem memObjects[3],
-                      float *a, float *b)
+                      float *a, float *b, int *numElements)
 {
     memObjects[0] = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                    sizeof(float) * ARRAY_SIZE, a, NULL);
@@ -186,8 +188,10 @@ bool CreateMemObjects(cl_context context, cl_mem memObjects[3],
                                    sizeof(float) * ARRAY_SIZE, b, NULL);
     memObjects[2] = clCreateBuffer(context, CL_MEM_READ_WRITE,
                                    sizeof(float) * ARRAY_SIZE, NULL, NULL);
+    memObjects[3] = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+    							   sizeof(int), numElements, NULL);
 
-    if (memObjects[0] == NULL || memObjects[1] == NULL || memObjects[2] == NULL)
+    if (memObjects[0] == NULL || memObjects[1] == NULL || memObjects[2] == NULL || memObjects[3] == NULL)
     {
         std::cerr << "Error creating memory objects." << std::endl;
         return false;
@@ -200,9 +204,9 @@ bool CreateMemObjects(cl_context context, cl_mem memObjects[3],
 //  Cleanup any created OpenCL resources
 //
 void Cleanup(cl_context context, cl_command_queue commandQueue,
-             cl_program program, cl_kernel kernel, cl_mem memObjects[3])
+             cl_program program, cl_kernel kernel, cl_mem memObjects[4])
 {
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
     {
         if (memObjects[i] != 0)
             clReleaseMemObject(memObjects[i]);
@@ -224,14 +228,14 @@ void Cleanup(cl_context context, cl_command_queue commandQueue,
 ///
 //	main() for HelloWorld example
 //
-int main(int argc, char** argv)
+int kernelCaller(const char* filename, const char* kernelName)
 {
     cl_context context = 0;
     cl_command_queue commandQueue = 0;
     cl_program program = 0;
     cl_device_id device = 0;
     cl_kernel kernel = 0;
-    cl_mem memObjects[3] = { 0, 0, 0 };
+    cl_mem memObjects[4] = { 0, 0, 0, 0 };
     cl_int errNum;
 
     // Create an OpenCL context on first available platform
@@ -252,7 +256,7 @@ int main(int argc, char** argv)
     }
 
     // Create OpenCL program from HelloWorld.cl kernel source
-    program = CreateProgram(context, device, "HelloWorld.cl");
+    program = CreateProgram(context, device, filename);
     if (program == NULL)
     {
         Cleanup(context, commandQueue, program, kernel, memObjects);
@@ -260,7 +264,7 @@ int main(int argc, char** argv)
     }
 
     // Create OpenCL kernel
-    kernel = clCreateKernel(program, "hello_kernel", NULL);
+    kernel = clCreateKernel(program, kernelName, NULL);
     if (kernel == NULL)
     {
         std::cerr << "Failed to create kernel" << std::endl;
@@ -274,22 +278,25 @@ int main(int argc, char** argv)
     float result[ARRAY_SIZE];
     float a[ARRAY_SIZE];
     float b[ARRAY_SIZE];
+    int *numElements = new int;
+    numElements[0] = ARRAY_SIZE;
     for (int i = 0; i < ARRAY_SIZE; i++)
     {
         a[i] = (float)i;
         b[i] = (float)(i * 2);
     }
 
-    if (!CreateMemObjects(context, memObjects, a, b))
+    if (!CreateMemObjects(context, memObjects, a, b, numElements))
     {
         Cleanup(context, commandQueue, program, kernel, memObjects);
         return 1;
     }
 
     // Set the kernel arguments (result, a, b)
-    errNum = clSetKernelArg(kernel, 0, sizeof(cl_mem), &memObjects[0]);
+    errNum  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &memObjects[0]);
     errNum |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &memObjects[1]);
     errNum |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &memObjects[2]);
+    errNum |= clSetKernelArg(kernel, 3, sizeof(cl_mem), &memObjects[3]);
     if (errNum != CL_SUCCESS)
     {
         std::cerr << "Error setting kernel arguments." << std::endl;
@@ -328,8 +335,20 @@ int main(int argc, char** argv)
         std::cout << result[i] << " ";
     }
     std::cout << std::endl;
-    std::cout << "Executed program succesfully." << std::endl;
+    std::cout << "Executed program successfully." << std::endl;
     Cleanup(context, commandQueue, program, kernel, memObjects);
 
     return 0;
+}
+
+int main(int argc, char** argv) {
+	std::map<std::string, std::string> kernelMap = {{"Adder.cl", "elemAdd"},
+													{"Subtracter.cl","elemSub"},
+													{"Multiplier.cl","elemMul"},
+													{"Divider.cl","elemDiv"},
+													{"Power.cl","elemPow"}};
+	for(auto& i : kernelMap) {
+		std::cout <<  i.first << ", " << i.second << std::endl;
+		kernelCaller(i.first.c_str(), i.second.c_str());
+	}
 }
