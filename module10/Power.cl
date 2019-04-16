@@ -6,5 +6,5 @@ __kernel void elemPow(__global float *a, __global *b, __global float *out, __glo
 		return;
 	}
 	
-	out[gid] = pow_(a[gid], b[gid]);
+	out[gid] = pow(a[gid], b[gid]);
 }
