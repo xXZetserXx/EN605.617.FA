@@ -18,6 +18,8 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <stdlib.h>
+#include <time.h>
 
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
@@ -30,32 +32,31 @@
 #endif
 
 // Constants
-const unsigned int inputSignalWidth  = 8;
-const unsigned int inputSignalHeight = 8;
+const unsigned int inputSignalWidth  = 49;
+const unsigned int inputSignalHeight = 49;
 
-cl_uint inputSignal[inputSignalWidth][inputSignalHeight] =
+// Will set values using a random number generator function later.
+cl_uint inputSignal[inputSignalWidth][inputSignalHeight];
+
+const unsigned int outputSignalWidth  = 43;
+const unsigned int outputSignalHeight = 43;
+
+cl_float outputSignal[outputSignalWidth][outputSignalHeight];
+
+const unsigned int maskWidth  = 7;
+const unsigned int maskHeight = 7;
+
+// Following filter values calculated with the following equation
+// 1 - ( (sqrt(rowD^2 + colDist^2)-1) * 0.25)
+cl_float mask[maskWidth][maskHeight] =
 {
-	{3, 1, 1, 4, 8, 2, 1, 3},
-	{4, 2, 1, 1, 2, 1, 2, 3},
-	{4, 4, 4, 4, 3, 2, 2, 2},
-	{9, 8, 3, 8, 9, 0, 0, 0},
-	{9, 3, 3, 9, 0, 0, 0, 0},
-	{0, 9, 0, 8, 0, 0, 0, 0},
-	{3, 0, 8, 8, 9, 4, 4, 4},
-	{5, 9, 8, 1, 8, 1, 1, 1}
-};
-
-const unsigned int outputSignalWidth  = 6;
-const unsigned int outputSignalHeight = 6;
-
-cl_uint outputSignal[outputSignalWidth][outputSignalHeight];
-
-const unsigned int maskWidth  = 3;
-const unsigned int maskHeight = 3;
-
-cl_uint mask[maskWidth][maskHeight] =
-{
-	{1, 1, 1}, {1, 0, 1}, {1, 1, 1},
+	{0.19, 0.35, 0.46, 0.50, 0.46, 0.35, 0.19},
+	{0.35, 0.54, 0.69, 0.75, 0.69, 0.54, 0.35},
+	{0.46, 0.69, 0.89, 1.00, 0.89, 0.69, 0.46},
+	{0.50, 0.75, 1.00, 1.00, 1.00, 0.75, 0.50},
+	{0.46, 0.69, 0.89, 1.00, 0.89, 0.69, 0.46},
+	{0.35, 0.54, 0.69, 0.75, 0.69, 0.54, 0.35},
+	{0.19, 0.35, 0.46, 0.50, 0.46, 0.35, 0.19}
 };
 
 ///
@@ -81,8 +82,17 @@ void CL_CALLBACK contextCallback(
 	exit(1);
 }
 
+void generateRandInput() {
+	srand(time(NULL));
+	for(int i=0; i<inputSignalWidth; i++) {
+		for(int j=0; j<inputSignalHeight; j++) {
+			inputSignal[i][j] = rand() % 10 + 1;		// Generate random number between 1 & 10
+		}
+	}
+}
+
 ///
-//	main() for Convoloution example
+//	main() for Convolution example
 //
 int main(int argc, char** argv)
 {
@@ -215,6 +225,9 @@ int main(int argc, char** argv)
 		"convolve",
 		&errNum);
 	checkErr(errNum, "clCreateKernel");
+
+	// TODO: Set values in inputSignal. I guess random values works?
+	generateRandInput();
 
 	// Now allocate buffers
 	inputSignalBuffer = clCreateBuffer(
