@@ -98,7 +98,7 @@ void generateRandInput() {
 ///
 //	main() for Convolution example
 //
-int main(int argc, char** argv)
+int run()
 {
     cl_int errNum;
     cl_uint numPlatforms;
@@ -112,11 +112,6 @@ int main(int argc, char** argv)
 	cl_mem inputSignalBuffer;
 	cl_mem outputSignalBuffer;
 	cl_mem maskBuffer;
-
-	int workItemsPerGroup=1;
-	if (argc == 2) {
-		workItemsPerGroup = atoi(argv[1]);
-	}
 
     // First, select an OpenCL platform to run on.  
 	errNum = clGetPlatformIDs(0, NULL, &numPlatforms);
@@ -222,30 +217,30 @@ int main(int argc, char** argv)
 	// Get Timestamp
 	auto tStartCopy = std::chrono::high_resolution_clock::now();
 
-    errNum  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputSignalBuffer);
-	errNum |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &maskBuffer);
-    errNum |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &outputSignalBuffer);
-	errNum |= clSetKernelArg(kernel, 3, sizeof(cl_uint), &inputSignalWidth);
-	errNum |= clSetKernelArg(kernel, 4, sizeof(cl_uint), &maskWidth);
+    errNum  = clSetKernelArg(kernel, 0, sizeof(cl_mem), 	&inputSignalBuffer);
+	errNum |= clSetKernelArg(kernel, 1, sizeof(cl_mem), 	&maskBuffer);
+    errNum |= clSetKernelArg(kernel, 2, sizeof(cl_mem), 	&outputSignalBuffer);
+	errNum |= clSetKernelArg(kernel, 3, sizeof(cl_uint), 	&inputSignalWidth);
+	errNum |= clSetKernelArg(kernel, 4, sizeof(cl_uint), 	&maskWidth);
 	checkErr(errNum, "clSetKernelArg");
 
 	auto tStartKernel = std::chrono::high_resolution_clock::now();
 
 	const size_t globalWorkSize[1] = { outputSignalWidth * outputSignalHeight };
-    const size_t localWorkSize[1]  = { 1 };
+    const size_t localWorkSize[1]  = { outputSignalWidth };
 
     // Queue the kernel up for execution across the array
-    errNum = clEnqueueNDRangeKernel(queue, kernel, 1, NULL,
-        globalWorkSize, localWorkSize,
-        0, NULL, NULL);
-
+    errNum = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
+    clFinish(queue);
 	checkErr(errNum, "clEnqueueNDRangeKernel");
+
 
 	auto tStartReadout = std::chrono::high_resolution_clock::now();
 
 	errNum = clEnqueueReadBuffer(queue, outputSignalBuffer, CL_TRUE,
         0, sizeof(cl_uint) * outputSignalHeight * outputSignalHeight,
 		outputSignal, 0, NULL, NULL);
+	clFinish(queue);
 	checkErr(errNum, "clEnqueueReadBuffer");
 
 	auto tStopReadout = std::chrono::high_resolution_clock::now();
@@ -272,6 +267,14 @@ int main(int argc, char** argv)
 	printf("Time to run the kernels: %fms\n", 						static_cast<float>(kernelT.count()*1000));
 	printf("Time to read data back to host: %fms\n", 				static_cast<float>(readOut.count()*1000));
 	printf("Total time of kernel execution and copies: %fms\n\n", 	static_cast<float>(totalT.count()*1000));
+
+	return 0;
+}
+
+int main(int argc, char** argv) {
+	run();
+	printf("========================================================\n");
+	run();
 
 	return 0;
 }
