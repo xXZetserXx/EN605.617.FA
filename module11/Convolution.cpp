@@ -20,6 +20,7 @@
 #include <string>
 #include <stdlib.h>
 #include <time.h>
+#include <chrono>
 
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
@@ -82,6 +83,9 @@ void CL_CALLBACK contextCallback(
 	exit(1);
 }
 
+/**
+ * Function to generate random data to put into the inputSignal global array
+ */
 void generateRandInput() {
 	srand(time(NULL));
 	for(int i=0; i<inputSignalWidth; i++) {
@@ -109,6 +113,11 @@ int main(int argc, char** argv)
 	cl_mem outputSignalBuffer;
 	cl_mem maskBuffer;
 
+	int workItemsPerGroup=1;
+	if (argc == 2) {
+		workItemsPerGroup = atoi(argv[1]);
+	}
+
     // First, select an OpenCL platform to run on.  
 	errNum = clGetPlatformIDs(0, NULL, &numPlatforms);
 	checkErr( 
@@ -129,12 +138,7 @@ int main(int argc, char** argv)
 	cl_uint i;
 	for (i = 0; i < numPlatforms; i++)
 	{
-		errNum = clGetDeviceIDs(
-            platformIDs[i], 
-            CL_DEVICE_TYPE_GPU, 
-            0,
-            NULL,
-            &numDevices);
+		errNum = clGetDeviceIDs(platformIDs[i], CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
 		if (errNum != CL_SUCCESS && errNum != CL_DEVICE_NOT_FOUND)
 	    {
 			checkErr(errNum, "clGetDeviceIDs");
@@ -142,12 +146,7 @@ int main(int argc, char** argv)
 	    else if (numDevices > 0) 
 	    {
 		   	deviceIDs = (cl_device_id *)alloca(sizeof(cl_device_id) * numDevices);
-			errNum = clGetDeviceIDs(
-				platformIDs[i],
-				CL_DEVICE_TYPE_GPU,
-				numDevices, 
-				&deviceIDs[0], 
-				NULL);
+			errNum = clGetDeviceIDs(platformIDs[i], CL_DEVICE_TYPE_GPU, numDevices, &deviceIDs[0], NULL);
 			checkErr(errNum, "clGetDeviceIDs");
 			break;
 	   }
@@ -166,13 +165,7 @@ int main(int argc, char** argv)
         (cl_context_properties)platformIDs[i],
         0
     };
-    context = clCreateContext(
-		contextProperties, 
-		numDevices,
-        deviceIDs, 
-		&contextCallback,
-		NULL, 
-		&errNum);
+    context = clCreateContext(contextProperties, numDevices, deviceIDs, &contextCallback, NULL, &errNum);
 	checkErr(errNum, "clCreateContext");
 
 	std::ifstream srcFile("Convolution.cl");
@@ -186,33 +179,16 @@ int main(int argc, char** argv)
 	size_t length = srcProg.length();
 
 	// Create program from source
-	program = clCreateProgramWithSource(
-		context, 
-		1, 
-		&src, 
-		&length, 
-		&errNum);
+	program = clCreateProgramWithSource(context, 1, &src, &length, &errNum);
 	checkErr(errNum, "clCreateProgramWithSource");
 
 	// Build program
-	errNum = clBuildProgram(
-		program,
-		numDevices,
-		deviceIDs,
-		NULL,
-		NULL,
-		NULL);
+	errNum = clBuildProgram(program, numDevices, deviceIDs, NULL, NULL, NULL);
     if (errNum != CL_SUCCESS)
     {
         // Determine the reason for the error
         char buildLog[16384];
-        clGetProgramBuildInfo(
-			program, 
-			deviceIDs[0], 
-			CL_PROGRAM_BUILD_LOG,
-            sizeof(buildLog), 
-			buildLog, 
-			NULL);
+        clGetProgramBuildInfo(program, deviceIDs[0], CL_PROGRAM_BUILD_LOG, sizeof(buildLog), buildLog, NULL);
 
         std::cerr << "Error in kernel: " << std::endl;
         std::cerr << buildLog;
@@ -220,47 +196,31 @@ int main(int argc, char** argv)
     }
 
 	// Create kernel object
-	kernel = clCreateKernel(
-		program,
-		"convolve",
-		&errNum);
+	kernel = clCreateKernel(program, "convolve", &errNum);
 	checkErr(errNum, "clCreateKernel");
 
 	// TODO: Set values in inputSignal. I guess random values works?
 	generateRandInput();
 
 	// Now allocate buffers
-	inputSignalBuffer = clCreateBuffer(
-		context,
-		CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-		sizeof(cl_uint) * inputSignalHeight * inputSignalWidth,
-		static_cast<void *>(inputSignal),
-		&errNum);
+	inputSignalBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+		sizeof(cl_uint) * inputSignalHeight * inputSignalWidth, static_cast<void *>(inputSignal), &errNum);
 	checkErr(errNum, "clCreateBuffer(inputSignal)");
 
-	maskBuffer = clCreateBuffer(
-		context,
-		CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-		sizeof(cl_uint) * maskHeight * maskWidth,
-		static_cast<void *>(mask),
-		&errNum);
+	maskBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+		sizeof(cl_uint) * maskHeight * maskWidth, static_cast<void *>(mask), &errNum);
 	checkErr(errNum, "clCreateBuffer(mask)");
 
-	outputSignalBuffer = clCreateBuffer(
-		context,
-		CL_MEM_WRITE_ONLY,
-		sizeof(cl_uint) * outputSignalHeight * outputSignalWidth,
-		NULL,
-		&errNum);
+	outputSignalBuffer = clCreateBuffer( context, CL_MEM_WRITE_ONLY,
+		sizeof(cl_uint) * outputSignalHeight * outputSignalWidth, NULL, &errNum);
 	checkErr(errNum, "clCreateBuffer(outputSignal)");
 
 	// Pick the first device and create command queue.
-	queue = clCreateCommandQueue(
-		context,
-		deviceIDs[0],
-		0,
-		&errNum);
+	queue = clCreateCommandQueue(context,deviceIDs[0], 0, &errNum);
 	checkErr(errNum, "clCreateCommandQueue");
+
+	// Get Timestamp
+	auto tStartCopy = std::chrono::high_resolution_clock::now();
 
     errNum  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputSignalBuffer);
 	errNum |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &maskBuffer);
@@ -269,45 +229,49 @@ int main(int argc, char** argv)
 	errNum |= clSetKernelArg(kernel, 4, sizeof(cl_uint), &maskWidth);
 	checkErr(errNum, "clSetKernelArg");
 
+	auto tStartKernel = std::chrono::high_resolution_clock::now();
+
 	const size_t globalWorkSize[1] = { outputSignalWidth * outputSignalHeight };
     const size_t localWorkSize[1]  = { 1 };
 
     // Queue the kernel up for execution across the array
-    errNum = clEnqueueNDRangeKernel(
-		queue, 
-		kernel, 
-		1, 
-		NULL,
-        globalWorkSize, 
-		localWorkSize,
-        0, 
-		NULL, 
-		NULL);
+    errNum = clEnqueueNDRangeKernel(queue, kernel, 1, NULL,
+        globalWorkSize, localWorkSize,
+        0, NULL, NULL);
+
 	checkErr(errNum, "clEnqueueNDRangeKernel");
-    
-	errNum = clEnqueueReadBuffer(
-		queue, 
-		outputSignalBuffer, 
-		CL_TRUE,
-        0, 
-		sizeof(cl_uint) * outputSignalHeight * outputSignalHeight, 
-		outputSignal,
-        0, 
-		NULL, 
-		NULL);
+
+	auto tStartReadout = std::chrono::high_resolution_clock::now();
+
+	errNum = clEnqueueReadBuffer(queue, outputSignalBuffer, CL_TRUE,
+        0, sizeof(cl_uint) * outputSignalHeight * outputSignalHeight,
+		outputSignal, 0, NULL, NULL);
 	checkErr(errNum, "clEnqueueReadBuffer");
 
-    // Output the result buffer
-    for (int y = 0; y < outputSignalHeight; y++)
-	{
-		for (int x = 0; x < outputSignalWidth; x++)
-		{
-			std::cout << outputSignal[x][y] << " ";
-		}
-		std::cout << std::endl;
-	}
+	auto tStopReadout = std::chrono::high_resolution_clock::now();
 
-    std::cout << std::endl << "Executed program succesfully." << std::endl;
+//    // Output the result buffer
+//    for (int y = 0; y < outputSignalHeight; y++)
+//	{
+//		for (int x = 0; x < outputSignalWidth; x++)
+//		{
+//			std::cout << outputSignal[x][y] << " ";
+//		}
+//		std::cout << std::endl;
+//	}
+
+    std::cout << std::endl << "Executed program successfully." << std::endl;
+
+    auto copy2Dev = std::chrono::duration_cast<std::chrono::duration<double>>(tStartKernel  - tStartCopy);
+	auto kernelT  = std::chrono::duration_cast<std::chrono::duration<double>>(tStartReadout - tStartKernel);
+	auto readOut  = std::chrono::duration_cast<std::chrono::duration<double>>(tStopReadout  - tStartReadout);
+	auto totalT   = std::chrono::duration_cast<std::chrono::duration<double>>(tStopReadout  - tStartKernel);
+
+//	printf("Array Size: %d\t Size in Bytes: %d\n", 	ARRAY_SIZE, ARRAY_SIZE*sizeof(float)/8);
+	printf("Time to copy data to device: %fms\n", 					static_cast<float>(copy2Dev.count()*1000));
+	printf("Time to run the kernels: %fms\n", 						static_cast<float>(kernelT.count()*1000));
+	printf("Time to read data back to host: %fms\n", 				static_cast<float>(readOut.count()*1000));
+	printf("Total time of kernel execution and copies: %fms\n\n", 	static_cast<float>(totalT.count()*1000));
 
 	return 0;
 }
