@@ -17,11 +17,16 @@ if(NOT DEFINED CMAKE_CUDA_STANDARD)
 endif()
 # ==============================================
 # External Project setup
-include_directories(${CMAKE_SOURCE_DIR}/ext/includes)
+include_directories(SYSTEM INTERFACE ${CMAKE_SOURCE_DIR}/ext/includes)
 # ==============================================
 
-set(SRCS ${CMAKE_SOURCE_DIR}/src/main.cpp)
+set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
+set(SRCS 
+	${SRC_DIR}/main.cpp
+	${SRC_DIR}/filterGen.cu)
 
 
-cuda_add_executable(helloworld ${SRCS})
-target_link_libraries(helloworld X11 png)
+include_directories(${CMAKE_SOURCE_DIR}/src)
+
+cuda_add_executable(cu_CGH ${SRCS})
+target_link_libraries(cu_CGH X11 png cufft)

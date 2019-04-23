@@ -5,21 +5,26 @@
  *      Author: Mikhail Wolff
  */
 
-
+// Dev libraries
+#include <iostream>
 #include <string>
+#include <cmath>
 
+// External Libraries
 #include <CImg.h>
 
+// My headers
+#include "filterGen.h"
+
+typedef float2 complex;
 
 int main(int argc, char *argv[]) {
 
-	std::string filename = "Lena.png";
+	std::string filename = "../../common/data/Lena.bmp";
 	cimg_library::CImg<unsigned char> img(filename.c_str());
 
-	int width = img.width();
-	int height = img.height();
-
-	// TODO: Generate filter kernel image.
+	std::cout << "Calling calcSpatImpulseResponse" << std::endl;
+    calcSpatImpulseResponse(img);
 
 	return 0;
 }
