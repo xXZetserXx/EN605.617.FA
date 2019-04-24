@@ -11,20 +11,32 @@
 #include <cmath>
 
 // External Libraries
+// save diagnostic state
+#pragma GCC diagnostic push
+// turn off warnings
+#pragma GCC diagnostic ignored "-Wvla"
+#pragma GCC diagnostic ignored "-Wunreachable-code"
 #include <CImg.h>
+// turn the warnings back on
+#pragma GCC diagnostic pop
 
 // My headers
 #include "filterGen.h"
 
-typedef float2 complex;
+
 
 int main(int argc, char *argv[]) {
 
-	std::string filename = "../../common/data/Lena.bmp";
+    float zDist = .001;
+    if(argc==2){
+        zDist = atof(argv[1]);
+    }
+
+	std::string filename = "../pointSource.png";
 	cimg_library::CImg<unsigned char> img(filename.c_str());
 
 	std::cout << "Calling calcSpatImpulseResponse" << std::endl;
-    calcSpatImpulseResponse(img);
+    calcSpatImpulseResponse(img, zDist);
 
 	return 0;
 }
