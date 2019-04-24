@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#define ARRAY_SIZE 256
+#define ARRAY_SIZE 512
 #define ARRAY_SIZE_IN_BYTES (sizeof(unsigned int) * (ARRAY_SIZE))
 
 /* Declare  statically two arrays of ARRAY_SIZE each */

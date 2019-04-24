@@ -92,17 +92,13 @@ int main(void)
 			case 0:
 			{
 				/* Execute our kernel */
-				what_is_my_id_2d_A<<<blocks_rect, threads_rect>>>(gpu_block_x, gpu_block_y,
-	gpu_thread, gpu_calc_thread, gpu_xthread, gpu_ythread, gpu_grid_dimx, gpu_block_dimx,
-	gpu_grid_dimy, gpu_block_dimy);
+				what_is_my_id_2d_A<<<blocks_rect, threads_rect>>>(gpu_block_x, gpu_block_y, gpu_thread, gpu_calc_thread, gpu_xthread, gpu_ythread, gpu_grid_dimx, gpu_block_dimx, gpu_grid_dimy, gpu_block_dimy);
 			} break;
 
 			case 1:
 			{
 				/* Execute our kernel */
-				what_is_my_id_2d_A<<<blocks_square, threads_square>>>(gpu_block_x, gpu_block_y,
-	gpu_thread, gpu_calc_thread, gpu_xthread, gpu_ythread, gpu_grid_dimx, gpu_block_dimx,
-	gpu_grid_dimy, gpu_block_dimy);
+				what_is_my_id_2d_A<<<blocks_square, threads_square>>>(gpu_block_x, gpu_block_y, gpu_thread, gpu_calc_thread, gpu_xthread, gpu_ythread, gpu_grid_dimx, gpu_block_dimx, gpu_grid_dimy, gpu_block_dimy);
 			} break;
 
 			default: exit(1); break;
