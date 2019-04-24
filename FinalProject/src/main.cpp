@@ -28,11 +28,15 @@
 int main(int argc, char *argv[]) {
 
     float zDist = .001;
-    if(argc==2){
-        zDist = atof(argv[1]);
+    std::string filename = "../pointSource.png";
+    if(argc>=2){
+        filename = argv[1];
+    }
+    if(argc==3){
+        zDist = atof(argv[2]);
     }
 
-	std::string filename = "../pointSource.png";
+
 	cimg_library::CImg<unsigned char> img(filename.c_str());
 
 	std::cout << "Calling calcSpatImpulseResponse" << std::endl;

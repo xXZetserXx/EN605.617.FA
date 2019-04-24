@@ -50,9 +50,9 @@ __global__ void ComplexMUL(complex *a, complex *b)
 __global__ void createHolo(complex* fzp, float* out) {
     uint i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-    out[i] = ( (1+fzp[i].x)*(1+fzp[i].x) ) - ( fzp[i].y * fzp[i].y );
+    out[i] = abs(( (1+fzp[i].x)*(1+fzp[i].x) ) - ( fzp[i].y * fzp[i].y ));
 //    fzp[i].x += 1;
-//    out[i] = cuCabsf(fzp[i]);
+//    out[i] = cuCabsf(fzp[i]) * cuCabsf(fzp[i]);
 //    printf("%f + j%f\n", fzp[i].x,fzp[i].y);
 }
 
@@ -193,12 +193,16 @@ void calcSpatImpulseResponse(cimg_library::CImg<unsigned char> img, float distan
 
     cudaMemcpy(h_holo, d_holoShifted, sizeof(float)*numPix, cudaMemcpyDeviceToHost);
 
+    float myMax = *(std::max_element(h_holo, h_holo+(numPix-1)));
+    printf("Max pixel value: %f\n", myMax);
     cimg_library::CImg<float> holoImg(width, height, 1, 1, 0);
     for(int i=0; i<height; i++) {
         for(int j=0; j<width; j++) {
-            holoImg(j, i, 0) = h_holo[i*width+j];
+            holoImg(j, i, 0) = 255*h_holo[i*width+j]/myMax;
+//            printf("%f\n", holoImg(j,i,0));
         }
     }
+
 
     cimg_library::CImgDisplay finalDisp(holoImg,"Hologram Image");
     while (!finalDisp.is_closed()) {
