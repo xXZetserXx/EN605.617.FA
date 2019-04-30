@@ -47,7 +47,16 @@ __global__ void ComplexMUL(complex *a, complex *b)
 //    printf("%f + j%f\n", a[i].x, a[i].y);
 }
 
-__global__ void fftshift(complex *in_img, complex *out_img) {
+__global__ void createHolo(complex* fzp, float* out) {
+    uint i = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+    out[i] = abs(( (1+fzp[i].x)*(1+fzp[i].x) ) - ( fzp[i].y * fzp[i].y ));
+//    fzp[i].x += 1;
+//    out[i] = cuCabsf(fzp[i]) * cuCabsf(fzp[i]);
+//    printf("%f + j%f\n", fzp[i].x,fzp[i].y);
+}
+
+__global__ void ifftshift(const float *in_img, float *out_img) {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     uint oldRow = idx/pixWidth;
     uint oldCol = idx%pixWidth;
@@ -56,36 +65,26 @@ __global__ void fftshift(complex *in_img, complex *out_img) {
     uint newCol = 0;
 
     if(oldRow<pixHeight && oldCol<pixWidth) {
-        if( oldRow<(pixHeight/2-1) ) {
-            newRow = oldRow + (pixHeight/2) - 1;
+        if( oldRow < (pixHeight/2) ) {
+            newRow = oldRow + (pixHeight/2);
         }
         else {
-            newRow = oldRow - (pixHeight/2) - 1;
+            newRow = oldRow - (pixHeight/2);
         }
 
-        if( oldCol<(pixWidth/2-1) ) {
-            newCol = oldCol + (pixWidth/2) - 1;
+        if( oldCol < (pixWidth/2) ) {
+            newCol = oldCol + (pixWidth/2);
         }
         else {
-            newCol = oldCol - (pixWidth/2) - 1;
+            newCol = oldCol - (pixWidth/2);
         }
 
         out_img[newRow*pixWidth+newCol] = in_img[oldRow*pixWidth+oldCol];
 
-
+//        if(oldRow == 0)
+//            printf("(%d,%d) => (%d,%d)\n", oldRow, oldCol, newRow, newCol);
     }
 
-}
-
-
-
-__global__ void createHolo(complex* fzp, float* out) {
-    uint i = (blockIdx.x * blockDim.x) + threadIdx.x;
-
-    out[i] = ( (1+fzp[i].x)*(1+fzp[i].x) ) - ( fzp[i].y * fzp[i].y );
-//    fzp[i].x += 1;
-//    out[i] = cuCabsf(fzp[i]);
-//    printf("%f + j%f\n", fzp[i].x,fzp[i].y);
 }
 
 void calcSpatImpulseResponse(cimg_library::CImg<unsigned char> img, float distance) {
@@ -115,7 +114,8 @@ void calcSpatImpulseResponse(cimg_library::CImg<unsigned char> img, float distan
     const int zSize = sizeof(float);
     h_zDist = (float*)malloc(zSize);
     h_zDist[0] = distance;
-    /* For when each pixel may have a different distance
+    /*
+     * Will want to use an array of z distances if object pixels are not all the same distance from the hologram plane
     const int zSize = width*height*sizeof(float);
     h_zDist = new float[width*height];
     for(int i=0; i<numPix; i++)
@@ -134,7 +134,7 @@ void calcSpatImpulseResponse(cimg_library::CImg<unsigned char> img, float distan
     complex *h_image = new complex[numPix];
     for(int i=0; i<height; i++) {
         for(int j=0; j<width; j++) {
-            h_image[(i*width+j)].x = (img(j, i, 0)/255.0);     // Only performing filter on one color channel
+            h_image[(i*width+j)].x = (img(j, i, 0));     // Only performing filter on one color channel
             h_image[(i*width+j)].y = 0;
 //            printf("Image value: %f\n", h_image[(i*width+j)].x);
         }
@@ -143,7 +143,6 @@ void calcSpatImpulseResponse(cimg_library::CImg<unsigned char> img, float distan
     cudaMalloc((void**)&d_image, compImgSize);
     cudaMemcpy(d_image, h_image, compImgSize, cudaMemcpyHostToDevice);
 
-    std::cout << "Did I make it?" << std::endl;
     // We will be generating the filter based on position and will never pull it out of GPU memory
 
     cufftComplex *d_filter;   // filter that will be calculated based on position by GPU
@@ -185,19 +184,22 @@ void calcSpatImpulseResponse(cimg_library::CImg<unsigned char> img, float distan
     float* h_holo;
     h_holo = new float[numPix];
 
-    float* d_holo;
+    float* d_holo, *d_holoShifted;
     cudaMalloc((void**)&d_holo, sizeof(float)*numPix);
+    cudaMalloc((void**)&d_holoShifted, sizeof(float)*numPix);
 
     createHolo <<<numBlocks, blockSize>>>(d_image, d_holo);
+    ifftshift <<<numBlocks, blockSize>>>(d_holo, d_holoShifted);
 
+    cudaMemcpy(h_holo, d_holoShifted, sizeof(float)*numPix, cudaMemcpyDeviceToHost);
 
-    cudaMemcpy(h_holo, d_holo, sizeof(float)*numPix, cudaMemcpyDeviceToHost);
-
-//    float* myMax = std::max_element(h_holo, h_holo+(numPix-1));
+    float myMax = *(std::max_element(h_holo, h_holo+(numPix-1)));
+    printf("Max pixel value: %f\n", myMax);
     cimg_library::CImg<float> holoImg(width, height, 1, 1, 0);
     for(int i=0; i<height; i++) {
         for(int j=0; j<width; j++) {
-            holoImg(j, i, 0) = h_holo[i*width+j];
+            holoImg(j, i, 0) = 255*h_holo[i*width+j]/myMax;
+//            printf("%f\n", holoImg(j,i,0));
         }
     }
 
@@ -206,9 +208,12 @@ void calcSpatImpulseResponse(cimg_library::CImg<unsigned char> img, float distan
     while (!finalDisp.is_closed()) {
         finalDisp.wait();
     }
-//    img.save_bmp("origLena.bmp");
-    holoImg.save_bmp("createdHologram.png");
+
+
+    // CImg save functions do not normalize like the display functions do, so I will need to normalize my image myself.
+    holoImg.save_bmp("createdHologram.bmp");
 
     cudaFree(d_image);
     cudaFree(d_holo);
+    cudaFree(d_holoShifted);
 }
