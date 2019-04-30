@@ -200,21 +200,12 @@ int main(int argc, char** argv)
     buffers.push_back(buffer);
 
     // now for all devices other than the first create a sub-buffer
-    for (unsigned int i = 1; i < numDevices; i++)
+    const int filtSize = 4;
+    for (unsigned int i = 1; i < 16; i++)
     {
-        cl_buffer_region region = 
-            {
-                NUM_BUFFER_ELEMENTS * i * sizeof(int), 
-                NUM_BUFFER_ELEMENTS * sizeof(int)
-            };
-        buffer = clCreateSubBuffer(
-            buffers[0],
-            CL_MEM_READ_WRITE,
-            CL_BUFFER_CREATE_TYPE_REGION,
-            &region,
-            &errNum);
+        cl_buffer_region region = {filtSize * i * sizeof(int), filtSize * sizeof(int)};
+        buffer = clCreateSubBuffer(buffers[0], CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &region, &errNum);
         checkErr(errNum, "clCreateSubBuffer");
-
         buffers.push_back(buffer);
     }
 
@@ -320,33 +311,33 @@ int main(int argc, char** argv)
 
     if (useMap)
     {
-        cl_int * mapPtr = (cl_int*) clEnqueueMapBuffer(
-            queues[0],
-            buffers[0],
-            CL_TRUE,
-            CL_MAP_READ,
-            0,
-            sizeof(cl_int) * NUM_BUFFER_ELEMENTS * numDevices,
-            0,
-            NULL,
-            NULL,
-            &errNum);
-        checkErr(errNum, "clEnqueueMapBuffer(..)");
-
-        for (unsigned int i = 0; i < NUM_BUFFER_ELEMENTS * numDevices; i++)
-        {
-            inputOutput[i] = mapPtr[i];
-        }
-
-        errNum = clEnqueueUnmapMemObject(
-            queues[0],
-            buffers[0],
-            mapPtr,
-            0,
-            NULL,
-            NULL);
-
-        clFinish(queues[0]);
+//        cl_int * mapPtr = (cl_int*) clEnqueueMapBuffer(
+//            queues[0],
+//            buffers[0],
+//            CL_TRUE,
+//            CL_MAP_READ,
+//            0,
+//            sizeof(cl_int) * NUM_BUFFER_ELEMENTS * numDevices,
+//            0,
+//            NULL,
+//            NULL,
+//            &errNum);
+//        checkErr(errNum, "clEnqueueMapBuffer(..)");
+//
+//        for (unsigned int i = 0; i < NUM_BUFFER_ELEMENTS * numDevices; i++)
+//        {
+//            inputOutput[i] = mapPtr[i];
+//        }
+//
+//        errNum = clEnqueueUnmapMemObject(
+//            queues[0],
+//            buffers[0],
+//            mapPtr,
+//            0,
+//            NULL,
+//            NULL);
+//
+//        clFinish(queues[0]);
     }
     else 
     {

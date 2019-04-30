@@ -1,2 +1,2 @@
-all: assignment.c
-	gcc assignment.c -o assignment.exe
+all: assignment.cpp
+	g++ assignment.cpp -o assignment -lOpenCL -std=c++11
